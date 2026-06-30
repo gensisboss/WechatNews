@@ -1,0 +1,32 @@
+title_template: "AI/Game Daily {date}"
+intro: "A concise daily digest of public AI and game industry updates."
+max_items: 12
+lookback_hours: 36
+timeout_seconds: 20
+
+keywords:
+  - AI
+  - artificial intelligence
+  - OpenAI
+  - model
+  - game
+  - games
+  - gaming
+  - Unity
+  - Unreal
+  - Tencent
+  - NetEase
+  - mini game
+  - NPC
+
+exclude_keywords:
+  - giveaway
+  - coupon
+  - unrelated
+
+wechat:
+  create_draft: true
+  author: "Auto"
+  digest: "Daily AI and game industry digest."
+  source_url: ""
+  cover_image: "assets/default-cover.png"

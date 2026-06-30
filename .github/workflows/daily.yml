@@ -1,0 +1,40 @@
+name: Daily WeChat News Draft
+
+on:
+  schedule:
+    # 09:00 Asia/Shanghai.
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+jobs:
+  create-draft:
+    runs-on: ubuntu-latest
+    env:
+      WECHAT_APP_ID: ${{ secrets.WECHAT_APP_ID }}
+      WECHAT_APP_SECRET: ${{ secrets.WECHAT_APP_SECRET }}
+      WECHAT_THUMB_MEDIA_ID: ${{ secrets.WECHAT_THUMB_MEDIA_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Show runner egress IP
+        run: curl -s https://api.ipify.org || true
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Generate digest and create WeChat draft
+        run: python src/main.py --config config.yml --sources sources.yml --output output
+
+      - name: Upload generated digest
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wechat-news-digest
+          path: output/

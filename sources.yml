@@ -1,0 +1,35 @@
+sources:
+  - name: "OpenAI News"
+    url: "https://openai.com/news/rss.xml"
+    category: "ai"
+    enabled: true
+
+  - name: "Google AI Blog"
+    url: "https://blog.google/technology/ai/rss/"
+    category: "ai"
+    enabled: true
+
+  - name: "Microsoft AI News"
+    url: "https://news.microsoft.com/source/topics/ai/feed/"
+    category: "ai"
+    enabled: true
+
+  - name: "Unity Blog"
+    url: "https://unity.com/blog/feed"
+    category: "game"
+    enabled: true
+
+  - name: "GamesIndustry.biz"
+    url: "https://www.gamesindustry.biz/feed"
+    category: "game"
+    enabled: true
+
+  - name: "VentureBeat AI"
+    url: "https://venturebeat.com/category/ai/feed/"
+    category: "ai"
+    enabled: true
+
+  - name: "VentureBeat Games"
+    url: "https://venturebeat.com/category/games/feed/"
+    category: "game"
+    enabled: true
