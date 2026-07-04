@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import html
 
+from .article_writer import GeneratedArticle
 from .fetchers import NewsItem
 
 
@@ -16,14 +17,14 @@ def render_html(items: list[NewsItem], title: str, intro: str) -> str:
     ]
 
     if not items:
-        chunks.append("<p>No matching news items were found for this run.</p>")
+        chunks.append("<p>本次没有找到匹配的新闻。</p>")
     else:
         for index, item in enumerate(items, start=1):
             chunks.append(_render_html_item(index, item))
 
     chunks.append(
         '<p style="color:#8c8c8c;font-size:13px;">'
-        "Sources are linked for reading the original posts. This digest only summarizes public metadata."
+        "以上内容根据公开 RSS/Atom 源的标题和摘要整理，详细信息请阅读原文。"
         "</p>"
     )
     chunks.append("</section>")
@@ -34,48 +35,163 @@ def render_markdown(items: list[NewsItem], title: str, intro: str) -> str:
     lines = [f"# {title}", "", intro, ""]
 
     if not items:
-        lines.append("No matching news items were found for this run.")
+        lines.append("本次没有找到匹配的新闻。")
         return "\n".join(lines) + "\n"
 
     for index, item in enumerate(items, start=1):
-        published = _format_date(item.published_at)
         lines.extend(
             [
                 f"## {index}. {item.title}",
                 "",
-                f"- Source: {item.source}",
-                f"- Published: {published}",
-                f"- Link: {item.url}",
+                _chinese_digest(item),
+                "",
+                _render_markdown_source_link(item.url),
+                "",
             ]
         )
-        if item.summary:
-            lines.append(f"- Summary: {_shorten(item.summary, 220)}")
-        lines.append("")
+
+    return "\n".join(lines)
+
+
+def render_articles_html(items: list[GeneratedArticle], title: str, intro: str) -> str:
+    chunks = [
+        '<section style="font-size:16px;line-height:1.8;color:#222;">',
+        f"<h1>{html.escape(title)}</h1>",
+        f'<p style="color:#57606a;">{html.escape(intro)}</p>',
+    ]
+
+    if not items:
+        chunks.append("<p>本次没有生成文章。</p>")
+    else:
+        for index, item in enumerate(items, start=1):
+            chunks.append(_render_article_html_item(index, item))
+
+    chunks.append("</section>")
+    return "\n".join(chunks)
+
+
+def render_articles_markdown(items: list[GeneratedArticle], title: str, intro: str) -> str:
+    lines = [f"# {title}", "", intro, ""]
+
+    if not items:
+        lines.append("本次没有生成文章。")
+        return "\n".join(lines) + "\n"
+
+    for index, item in enumerate(items, start=1):
+        lines.extend(
+            [
+                f"## {index}. {item.title}",
+                "",
+                *(_render_markdown_image(item) if item.image_url else []),
+                item.body.strip(),
+                "",
+            ]
+        )
 
     return "\n".join(lines)
 
 
 def _render_html_item(index: int, item: NewsItem) -> str:
-    summary = _shorten(item.summary, 220) if item.summary else "No summary provided by the source feed."
     return "\n".join(
         [
             '<section style="margin:20px 0;padding:14px 0;border-top:1px solid #eaecef;">',
-            f"<h2>{index}. {html.escape(item.title)}</h2>",
+            (
+                '<h2 style="font-size:22px;font-weight:700;line-height:1.35;'
+                'margin:28px 0 12px;color:#111;">'
+                f"{index}. {html.escape(item.title)}</h2>"
+            ),
             (
                 '<p style="color:#57606a;font-size:14px;">'
                 f"{html.escape(item.source)} · {html.escape(_format_date(item.published_at))}"
                 "</p>"
             ),
-            f"<p>{html.escape(summary)}</p>",
-            f'<p><a href="{html.escape(item.url, quote=True)}">Read original source</a></p>',
+            f"<p>{html.escape(_chinese_digest(item))}</p>",
+            _render_html_source_link(item.url),
             "</section>",
         ]
     )
 
 
+def _render_article_html_item(index: int, item: GeneratedArticle) -> str:
+    paragraphs = [
+        f"<p>{html.escape(paragraph.strip())}</p>"
+        for paragraph in item.body.splitlines()
+        if paragraph.strip()
+    ]
+    if not paragraphs:
+        paragraphs = [f"<p>{html.escape(item.body.strip())}</p>"]
+
+    return "\n".join(
+        [
+            '<section style="margin:26px 0;padding:18px 0;border-top:1px solid #eaecef;">',
+            (
+                '<h2 style="font-size:22px;font-weight:700;line-height:1.35;'
+                'margin:28px 0 12px;color:#111;">'
+                f"{index}. {html.escape(item.title)}</h2>"
+            ),
+            *(_render_article_image(item) if item.image_url else []),
+            *paragraphs,
+            "</section>",
+        ]
+    )
+
+
+def _render_article_image(item: GeneratedArticle) -> list[str]:
+    return [
+        (
+            f'<img src="{html.escape(item.image_url or "", quote=True)}" '
+            f'alt="{html.escape(item.title, quote=True)}" '
+            'style="width:100%;max-width:680px;height:auto;display:block;margin:12px 0 18px;" />'
+        )
+    ]
+
+
+def _render_markdown_image(item: GeneratedArticle) -> list[str]:
+    return [f"![{item.title}]({item.image_url})", ""]
+
+
+def _render_html_source_link(url: str) -> str:
+    escaped_url = html.escape(url, quote=True)
+    return (
+        '<p>原文链接：'
+        f'<a href="{escaped_url}" style="color:#0969da;text-decoration:underline;">点击阅读原文</a>'
+        "</p>"
+    )
+
+
+def _render_markdown_source_link(url: str) -> str:
+    return f"原文链接：[点击阅读原文]({url})"
+
+
+def _chinese_digest(item: NewsItem) -> str:
+    summary = _shorten(item.summary, 180) if item.summary else "原始信息源没有提供摘要。"
+    published = _format_date(item.published_at)
+    topic_hint = _topic_hint(item)
+    return (
+        f"这条消息来自 {item.source}，发布时间为 {published}。"
+        f"从标题和摘要看，重点是{topic_hint}。"
+        f"原始摘要提到：{summary}"
+    )
+
+
+def _topic_hint(item: NewsItem) -> str:
+    text = f"{item.title} {item.summary}".casefold()
+    if any(
+        keyword in text
+        for keyword in ("openai", "google", "microsoft", "anthropic", "nvidia", "model", "ai")
+    ):
+        return "AI 技术、产品或产业合作的新进展"
+    if any(
+        keyword in text
+        for keyword in ("game", "gaming", "playstation", "xbox", "unity", "unreal", "studio")
+    ):
+        return "游戏行业的业务变化、工具更新或市场动态"
+    return "相关行业动态及其后续影响"
+
+
 def _format_date(value: dt.datetime | None) -> str:
     if value is None:
-        return "Unknown"
+        return "未知时间"
     return value.astimezone(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 

@@ -78,6 +78,43 @@ class RankerTests(unittest.TestCase):
 
         self.assertEqual(selected, [])
 
+    def test_select_top_items_can_require_same_beijing_calendar_day(self):
+        now = dt.datetime(2026, 7, 4, 2, 0, tzinfo=dt.timezone.utc)  # 2026-07-04 10:00 Asia/Shanghai
+        today_item = NewsItem(
+            title="AI game update today",
+            url="https://example.com/today",
+            source="AI Wire",
+            published_at=dt.datetime(2026, 7, 3, 16, 1, tzinfo=dt.timezone.utc),
+            summary="AI game production news.",
+        )
+        yesterday_item = NewsItem(
+            title="AI game update yesterday",
+            url="https://example.com/yesterday",
+            source="AI Wire",
+            published_at=dt.datetime(2026, 7, 3, 15, 59, tzinfo=dt.timezone.utc),
+            summary="AI game production news.",
+        )
+        undated_item = NewsItem(
+            title="AI game update without date",
+            url="https://example.com/undated",
+            source="AI Wire",
+            published_at=None,
+            summary="AI game production news.",
+        )
+
+        selected = select_top_items(
+            [today_item, yesterday_item, undated_item],
+            keywords=["AI", "game"],
+            exclude_keywords=[],
+            max_items=5,
+            lookback_hours=36,
+            now=now,
+            published_today_only=True,
+            timezone=dt.timezone(dt.timedelta(hours=8)),
+        )
+
+        self.assertEqual(selected, [today_item])
+
 
 if __name__ == "__main__":
     unittest.main()

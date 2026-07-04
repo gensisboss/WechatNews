@@ -12,10 +12,11 @@ from typing import Any
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from src.article_writer import DeepSeekArticleClient, generate_articles
 from src.config_loader import load_yaml
 from src.fetchers import Source, fetch_all_sources
 from src.ranker import select_top_items
-from src.renderer import render_html, render_markdown
+from src.renderer import render_articles_html, render_articles_markdown, render_html, render_markdown
 from src.wechat import (
     add_draft,
     build_draft_payload,
@@ -54,12 +55,31 @@ def main(argv: list[str] | None = None) -> int:
         exclude_keywords=list(config.get("exclude_keywords", [])),
         max_items=int(config.get("max_items", 12)),
         lookback_hours=int(config.get("lookback_hours", 36)),
+        published_today_only=bool(config.get("published_today_only", False)),
+        timezone=parse_timezone(str(config.get("timezone", "+00:00"))),
     )
 
     title = render_title(str(config.get("title_template", "AI/Game Daily {date}")))
     intro = str(config.get("intro", "A concise daily digest of AI and game industry updates."))
-    html = render_html(selected, title=title, intro=intro)
-    markdown = render_markdown(selected, title=title, intro=intro)
+
+    article_config = config.get("article_generation", {})
+    if bool(article_config.get("enabled", False)):
+        article_items = selected[: int(article_config.get("max_articles", len(selected)))]
+        client = DeepSeekArticleClient(
+            api_key=str(article_config.get("api_key", "")) or None,
+            model=str(article_config.get("model", "deepseek-chat")),
+            timeout_seconds=int(article_config.get("llm_timeout_seconds", 60)),
+        )
+        articles = generate_articles(
+            article_items,
+            client=client,
+            timeout_seconds=int(article_config.get("article_timeout_seconds", config.get("timeout_seconds", 20))),
+        )
+        html = render_articles_html(articles, title=title, intro=intro)
+        markdown = render_articles_markdown(articles, title=title, intro=intro)
+    else:
+        html = render_html(selected, title=title, intro=intro)
+        markdown = render_markdown(selected, title=title, intro=intro)
 
     stamp = dt.datetime.now().strftime("%Y-%m-%d")
     html_path = output_dir / f"{stamp}.html"
@@ -89,6 +109,28 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def render_title(template: str) -> str:
     today = dt.datetime.now().strftime("%Y-%m-%d")
     return template.format(date=today)
+
+
+def parse_timezone(value: str) -> dt.tzinfo:
+    normalized = value.strip()
+    if normalized in {"Asia/Shanghai", "China", "CST", "+08:00", "+0800"}:
+        return dt.timezone(dt.timedelta(hours=8))
+    if normalized in {"UTC", "Z", "+00:00", "+0000"}:
+        return dt.timezone.utc
+
+    sign = 1
+    if normalized.startswith("-"):
+        sign = -1
+        normalized = normalized[1:]
+    elif normalized.startswith("+"):
+        normalized = normalized[1:]
+
+    if ":" in normalized:
+        hour_text, minute_text = normalized.split(":", maxsplit=1)
+    else:
+        hour_text, minute_text = normalized[:2], normalized[2:] or "0"
+
+    return dt.timezone(sign * dt.timedelta(hours=int(hour_text), minutes=int(minute_text)))
 
 
 def create_wechat_draft(config: dict[str, Any], html: str) -> None:

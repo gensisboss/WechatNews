@@ -25,14 +25,19 @@ def select_top_items(
     max_items: int,
     lookback_hours: int,
     now: dt.datetime | None = None,
+    published_today_only: bool = False,
+    timezone: dt.tzinfo = dt.timezone.utc,
 ) -> list[NewsItem]:
     now = now or dt.datetime.now(dt.timezone.utc)
     cutoff = now - dt.timedelta(hours=lookback_hours)
+    local_today = now.astimezone(timezone).date()
     seen: set[str] = set()
     scored: list[ScoredItem] = []
 
     for item in items:
         if item.published_at is not None and item.published_at < cutoff:
+            continue
+        if published_today_only and not _is_published_on_date(item, local_today, timezone):
             continue
 
         haystack = f"{item.title} {item.summary} {item.source}".casefold()
@@ -57,6 +62,12 @@ def select_top_items(
         reverse=True,
     )
     return [entry.item for entry in scored[:max_items]]
+
+
+def _is_published_on_date(item: NewsItem, local_date: dt.date, timezone: dt.tzinfo) -> bool:
+    if item.published_at is None:
+        return False
+    return item.published_at.astimezone(timezone).date() == local_date
 
 
 def score_item(item: NewsItem, keywords: list[str]) -> int:

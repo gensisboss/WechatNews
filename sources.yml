@@ -33,3 +33,48 @@ sources:
     url: "https://venturebeat.com/category/games/feed/"
     category: "game"
     enabled: true
+
+  - name: "TechCrunch AI"
+    url: "https://techcrunch.com/category/artificial-intelligence/feed/"
+    category: "ai"
+    enabled: true
+
+  - name: "AI News"
+    url: "https://www.artificialintelligence-news.com/feed/"
+    category: "ai"
+    enabled: true
+
+  - name: "PocketGamer.biz"
+    url: "https://www.pocketgamer.biz/rss/"
+    category: "game"
+    enabled: true
+
+  - name: "Gematsu"
+    url: "https://www.gematsu.com/feed"
+    category: "game"
+    enabled: true
+
+  - name: "Eurogamer"
+    url: "https://www.eurogamer.net/feed"
+    category: "game"
+    enabled: true
+
+  - name: "Global Search AI"
+    url: "gdelt://search?query=(AI%20OR%20%22artificial%20intelligence%22%20OR%20%22generative%20AI%22)&category=ai&max_records=50&timespan=1d"
+    category: "ai"
+    enabled: false
+
+  - name: "Global Search AI Products"
+    url: "gdelt://search?query=(OpenAI%20OR%20Google%20AI%20OR%20Microsoft%20AI%20OR%20Anthropic%20OR%20Nvidia%20AI)&category=ai&max_records=50&timespan=1d"
+    category: "ai"
+    enabled: false
+
+  - name: "Global Search Gaming"
+    url: "gdelt://search?query=(gaming%20OR%20%22video%20game%22%20OR%20%22game%20industry%22%20OR%20Xbox%20OR%20PlayStation)&category=game&max_records=50&timespan=1d"
+    category: "game"
+    enabled: false
+
+  - name: "Global Search Game Development"
+    url: "gdelt://search?query=(Unity%20OR%20Unreal%20Engine%20OR%20%22game%20developer%22%20OR%20%22game%20studio%22)&category=game&max_records=50&timespan=1d"
+    category: "game"
+    enabled: false

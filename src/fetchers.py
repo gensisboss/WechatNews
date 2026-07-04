@@ -3,8 +3,10 @@ from __future__ import annotations
 import datetime as dt
 import email.utils
 import html
+import json
 import logging
 import re
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
@@ -48,10 +50,42 @@ def fetch_all_sources(sources: Iterable[Source], timeout_seconds: int = 20) -> l
 
 
 def fetch_feed(source: Source, timeout_seconds: int = 20) -> list[NewsItem]:
-    request = urllib.request.Request(source.url, headers={"User-Agent": USER_AGENT})
+    if source.url.startswith("gdelt://search"):
+        request_url = _gdelt_request_url(source.url)
+    else:
+        request_url = source.url
+
+    request = urllib.request.Request(request_url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
         data = response.read()
+    if source.url.startswith("gdelt://search"):
+        return parse_gdelt_articles(data, source)
     return parse_feed(data, source)
+
+
+def parse_gdelt_articles(data: bytes, source: Source) -> list[NewsItem]:
+    payload = json.loads(data.decode("utf-8", errors="replace"))
+    items: list[NewsItem] = []
+    for article in payload.get("articles", []):
+        title = str(article.get("title", "")).strip()
+        url = str(article.get("url", "")).strip()
+        if not title or not url:
+            continue
+
+        domain = str(article.get("domain", "")).strip()
+        image = str(article.get("socialimage", "")).strip()
+        summary_parts = [part for part in [domain, image] if part]
+        items.append(
+            NewsItem(
+                title=_clean_space(title),
+                url=url,
+                source=source.name,
+                published_at=parse_gdelt_datetime(str(article.get("seendate", ""))),
+                summary=" ".join(summary_parts),
+                category=source.category,
+            )
+        )
+    return items
 
 
 def parse_feed(data: bytes, source: Source) -> list[NewsItem]:
@@ -134,6 +168,35 @@ def parse_datetime(value: str | None) -> dt.datetime | None:
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=dt.timezone.utc)
     return parsed.astimezone(dt.timezone.utc)
+
+
+def parse_gdelt_datetime(value: str) -> dt.datetime | None:
+    if not value:
+        return None
+    for fmt in ("%Y%m%dT%H%M%SZ", "%Y%m%d%H%M%S"):
+        try:
+            return dt.datetime.strptime(value, fmt).replace(tzinfo=dt.timezone.utc)
+        except ValueError:
+            continue
+    return parse_datetime(value)
+
+
+def _gdelt_request_url(value: str) -> str:
+    parsed = urllib.parse.urlsplit(value)
+    params = dict(urllib.parse.parse_qsl(parsed.query, keep_blank_values=True))
+    query = params.get("query", "").strip()
+    max_records = params.get("max_records", "50").strip() or "50"
+    gdelt_params = {
+        "query": query,
+        "mode": "ArtList",
+        "format": "json",
+        "sort": "DateDesc",
+        "maxrecords": max_records,
+    }
+    timespan = params.get("timespan", "1d").strip()
+    if timespan:
+        gdelt_params["timespan"] = timespan
+    return "https://api.gdeltproject.org/api/v2/doc/doc?" + urllib.parse.urlencode(gdelt_params)
 
 
 def _text(node: ET.Element, name: str, namespace: str | None = None) -> str:
