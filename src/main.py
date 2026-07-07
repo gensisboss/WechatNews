@@ -16,7 +16,7 @@ from src.article_writer import DeepSeekArticleClient, generate_articles
 from src.config_loader import load_yaml
 from src.fetchers import Source, fetch_all_sources
 from src.ranker import select_top_items
-from src.renderer import render_articles_html, render_articles_markdown, render_html, render_markdown
+from src.renderer import render_articles_html, render_html
 from src.wechat import (
     add_draft,
     build_draft_payload,
@@ -84,17 +84,13 @@ def main(argv: list[str] | None = None) -> int:
             timeout_seconds=int(article_config.get("article_timeout_seconds", config.get("timeout_seconds", 20))),
         )
         html = render_articles_html(articles, title=title, intro=intro)
-        markdown = render_articles_markdown(articles, title=title, intro=intro)
     else:
         html = render_html(selected, title=title, intro=intro)
-        markdown = render_markdown(selected, title=title, intro=intro)
 
     stamp = dt.datetime.now().strftime("%Y-%m-%d")
     html_path = output_dir / f"{stamp}.html"
-    markdown_path = output_dir / f"{stamp}.md"
     html_path.write_text(html, encoding="utf-8")
-    markdown_path.write_text(markdown, encoding="utf-8")
-    LOGGER.info("Wrote %s and %s", html_path, markdown_path)
+    LOGGER.info("Wrote %s", html_path)
 
     if args.dry_run or not bool(config.get("wechat", {}).get("create_draft", False)):
         LOGGER.info("Draft creation skipped.")

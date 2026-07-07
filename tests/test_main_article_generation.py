@@ -23,8 +23,8 @@ class MainArticleGenerationTests(unittest.TestCase):
             config.write_text(
                 textwrap.dedent(
                     """
-                    title_template: "AI/游戏行业观察 {date}"
-                    intro: "今日观察"
+                    title_template: "AI/Game Industry Watch {date}"
+                    intro: "Today"
                     max_items: 1
                     lookback_hours: 24
                     published_today_only: true
@@ -73,7 +73,7 @@ class MainArticleGenerationTests(unittest.TestCase):
                     return_value=[
                         GeneratedArticle(
                             title=item.title,
-                            body="这是一篇约五百字中文文章的测试正文。",
+                            body="Generated article body.",
                             url=item.url,
                             image_url="https://cdn.example.com/story.jpg",
                         )
@@ -96,13 +96,10 @@ class MainArticleGenerationTests(unittest.TestCase):
             self.assertEqual(select_top_items.call_args.kwargs["timezone"], dt.timezone(dt.timedelta(hours=8)))
             client_class.assert_called_once()
             self.assertEqual(client_class.call_args.kwargs["api_key"], "config-key")
-            markdown = next(output.glob("*.md")).read_text(encoding="utf-8")
-            self.assertIn("这是一篇约五百字中文文章的测试正文。", markdown)
-            self.assertIn("![AI changes game production](https://cdn.example.com/story.jpg)", markdown)
-            self.assertNotIn("原文链接", markdown)
-            self.assertNotIn("点击阅读原文", markdown)
-            self.assertNotIn("这条消息来自", markdown)
-
+            html = next(output.glob("*.html")).read_text(encoding="utf-8")
+            self.assertIn("Generated article body.", html)
+            self.assertIn('<img src="https://cdn.example.com/story.jpg"', html)
+            self.assertFalse(list(output.glob("*.md")))
 
     def test_main_passes_minimum_and_fallback_config_to_selection_and_generation(self):
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -1,4 +1,4 @@
-name: Daily WeChat News Draft
+name: Daily News Website
 
 on:
   push:
@@ -19,15 +19,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  create-draft:
+  build-site:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    env:
-      WECHAT_APP_ID: ${{ secrets.WECHAT_APP_ID }}
-      WECHAT_APP_SECRET: ${{ secrets.WECHAT_APP_SECRET }}
-      WECHAT_THUMB_MEDIA_ID: ${{ secrets.WECHAT_THUMB_MEDIA_ID }}
 
     steps:
       - name: Checkout
@@ -38,14 +34,11 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Show runner egress IP
-        run: curl -s https://api.ipify.org || true
-
       - name: Run tests
         run: python -m unittest discover -s tests -v
 
-      - name: Generate digest and create WeChat draft
-        run: python src/main.py --config config.yml --sources sources.yml --output output
+      - name: Generate digest website
+        run: python src/main.py --config config.yml --sources sources.yml --output output --dry-run
 
       - name: Prepare GitHub Pages site
         run: |

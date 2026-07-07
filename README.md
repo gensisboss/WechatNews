@@ -1,16 +1,16 @@
 # WeChat News Publisher
 
-Daily automation for collecting public AI/game news feeds and creating a WeChat Official Account draft or publishing it through the WeChat publish API.
+Daily automation for collecting public AI/game news feeds and publishing a static digest website.
 
-By default this project can create a draft and submit it for publishing when WeChat credentials are configured.
+The GitHub Actions workflow only generates the website for GitHub Pages. WeChat draft and publish support remains available for local runs or a fixed-IP server.
 
 ## What It Does
 
 1. GitHub Actions runs every day at 09:00 Asia/Shanghai.
 2. The script reads `sources.yml` and fetches RSS/Atom feeds.
-3. Items are filtered by `keywords`, deduplicated, ranked, and rendered to HTML/Markdown.
-4. The script creates a WeChat Official Account draft when credentials are configured.
-5. If `wechat.auto_publish` is enabled, the script submits the draft to the WeChat publish API.
+3. Items are filtered by `keywords`, deduplicated, ranked, and rendered to HTML.
+4. The workflow generates HTML output in dry-run mode, so it does not call WeChat APIs.
+5. The latest HTML file is published as the GitHub Pages homepage for `news.gongganghao.com`.
 6. Generated files are uploaded as a GitHub Actions artifact.
 
 ## Upload To GitHub
@@ -31,7 +31,9 @@ If you keep this folder inside another repository as a subfolder, move `.github/
 
 ## GitHub Secrets
 
-Create these repository secrets in GitHub:
+GitHub Actions does not need WeChat secrets when it is only generating the website.
+
+For local runs or a fixed-IP server that should create/publish WeChat articles, configure these environment variables:
 
 ```text
 WECHAT_APP_ID
@@ -50,14 +52,14 @@ Do not commit AppSecret, access tokens, cookies, QR codes, or account passwords.
 
 ## WeChat Setup Notes
 
+WeChat publishing should run from a stable outbound IP that is in the WeChat Official Account IP whitelist. GitHub-hosted runner IPs can change, so the GitHub Actions workflow uses `--dry-run` and does not call WeChat APIs.
+
 The script uses the WeChat Official Account APIs for access token, permanent image material upload, draft creation, and optional publishing:
 
 - Access token: <https://developers.weixin.qq.com/doc/offiaccount/Basic_Information/Get_access_token.html>
 - Draft box: <https://developers.weixin.qq.com/doc/offiaccount/Draft_Box/Add_draft.html>
 - Permanent material: <https://developers.weixin.qq.com/doc/offiaccount/Asset_Management/Adding_Permanent_Assets.html>
 - Publish: <https://developers.weixin.qq.com/doc/offiaccount/Publish/Publish.html>
-
-If your official account requires an IP whitelist, GitHub-hosted runner IPs can change. The workflow prints the current runner egress IP, but a fixed-egress self-hosted runner or cloud proxy is more stable for long-term use.
 
 ## Configure Sources
 
@@ -99,7 +101,7 @@ python -m unittest discover -s tests -v
 python src/main.py --config config.yml --sources sources.yml --output output --dry-run
 ```
 
-The dry run writes `output/YYYY-MM-DD.html` and `output/YYYY-MM-DD.md` without calling WeChat.
+The dry run writes `output/YYYY-MM-DD.html` without calling WeChat.
 
 ## Enable Or Disable WeChat Publishing
 
