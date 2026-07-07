@@ -69,7 +69,8 @@ exclude_keywords:
   - unrelated
 
 wechat:
-  create_draft: false
+  create_draft: true
+  auto_publish: true
   author: "Auto"
   digest: "Daily AI and game industry digest."
   source_url: ""

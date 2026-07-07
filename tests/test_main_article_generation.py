@@ -187,6 +187,79 @@ class MainArticleGenerationTests(unittest.TestCase):
             self.assertEqual(select_top_items.call_args.kwargs["fallback_keywords"], ["technology", "software"])
             self.assertEqual(list(generate_articles.call_args.args[0]), items)
 
+    def test_main_auto_publishes_created_draft_when_enabled(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config = root / "config.yml"
+            sources = root / "sources.yml"
+            output = root / "output"
+            config.write_text(
+                textwrap.dedent(
+                    """
+                    title_template: "AI/Game Daily {date}"
+                    intro: "Today"
+                    max_items: 1
+                    lookback_hours: 24
+                    timeout_seconds: 5
+                    keywords:
+                      - AI
+                    exclude_keywords:
+                    article_generation:
+                      enabled: false
+                    wechat:
+                      create_draft: true
+                      auto_publish: true
+                      author: "Auto"
+                      digest: "Daily digest."
+                      source_url: ""
+                    """
+                ).strip(),
+                encoding="utf-8",
+            )
+            sources.write_text(
+                textwrap.dedent(
+                    """
+                    sources:
+                      - name: Example
+                        url: https://example.com/feed.xml
+                        category: ai
+                        enabled: true
+                    """
+                ).strip(),
+                encoding="utf-8",
+            )
+            item = NewsItem(
+                title="AI changes game production",
+                url="https://example.com/story",
+                source="Example",
+                published_at=None,
+                summary="AI changes workflows.",
+            )
+
+            with (
+                patch("src.main.fetch_all_sources", return_value=[item]),
+                patch("src.main.select_top_items", return_value=[item]),
+                patch("src.main.credentials_from_env", return_value=object()),
+                patch("src.main.get_access_token", return_value="token123"),
+                patch.dict("os.environ", {"WECHAT_THUMB_MEDIA_ID": "thumb123"}, clear=False),
+                patch("src.main.add_draft", return_value="draft-media-123") as add_draft,
+                patch("src.main.submit_freepublish", return_value="publish123") as submit_freepublish,
+            ):
+                exit_code = main(
+                    [
+                        "--config",
+                        str(config),
+                        "--sources",
+                        str(sources),
+                        "--output",
+                        str(output),
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            add_draft.assert_called_once()
+            submit_freepublish.assert_called_once_with("token123", "draft-media-123")
+
 
 if __name__ == "__main__":
     unittest.main()

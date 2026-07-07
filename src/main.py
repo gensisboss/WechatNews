@@ -22,6 +22,7 @@ from src.wechat import (
     build_draft_payload,
     credentials_from_env,
     get_access_token,
+    submit_freepublish,
     upload_permanent_image,
 )
 
@@ -140,7 +141,7 @@ def parse_timezone(value: str) -> dt.tzinfo:
     return dt.timezone(sign * dt.timedelta(hours=int(hour_text), minutes=int(minute_text)))
 
 
-def create_wechat_draft(config: dict[str, Any], html: str) -> None:
+def create_wechat_draft(config: dict[str, Any], html: str) -> str:
     wechat_config = config.get("wechat", {})
     credentials = credentials_from_env()
     access_token = get_access_token(credentials)
@@ -164,6 +165,10 @@ def create_wechat_draft(config: dict[str, Any], html: str) -> None:
     )
     media_id = add_draft(access_token, payload)
     LOGGER.info("Created WeChat draft media_id=%s", media_id)
+    if bool(wechat_config.get("auto_publish", False)):
+        publish_id = submit_freepublish(access_token, media_id)
+        LOGGER.info("Submitted WeChat publish publish_id=%s", publish_id)
+    return media_id
 
 
 DEFAULT_COVER_PNG_BASE64 = (

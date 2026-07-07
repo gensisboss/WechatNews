@@ -79,6 +79,15 @@ def add_draft(access_token: str, payload: dict[str, Any]) -> str:
     return str(media_id)
 
 
+def submit_freepublish(access_token: str, media_id: str) -> str:
+    query = urllib.parse.urlencode({"access_token": access_token})
+    response = _request_json("POST", f"{API_BASE}/freepublish/submit?{query}", {"media_id": media_id})
+    publish_id = response.get("publish_id")
+    if not publish_id:
+        raise WeChatApiError(f"WeChat publish response did not include publish_id: {response}")
+    return str(publish_id)
+
+
 def upload_permanent_image(access_token: str, image_path: Path) -> str:
     if not image_path.exists():
         raise WeChatApiError(f"Cover image does not exist: {image_path}")
