@@ -27,12 +27,15 @@ def select_top_items(
     now: dt.datetime | None = None,
     published_today_only: bool = False,
     timezone: dt.tzinfo = dt.timezone.utc,
+    minimum_items: int = 0,
+    fallback_categories: list[str] | None = None,
+    fallback_keywords: list[str] | None = None,
 ) -> list[NewsItem]:
     now = now or dt.datetime.now(dt.timezone.utc)
     cutoff = now - dt.timedelta(hours=lookback_hours)
     local_today = now.astimezone(timezone).date()
     seen: set[str] = set()
-    scored: list[ScoredItem] = []
+    eligible: list[NewsItem] = []
 
     for item in items:
         if item.published_at is not None and item.published_at < cutoff:
@@ -43,7 +46,10 @@ def select_top_items(
         haystack = f"{item.title} {item.summary} {item.source}".casefold()
         if _contains_any(haystack, exclude_keywords):
             continue
+        eligible.append(item)
 
+    scored: list[ScoredItem] = []
+    for item in eligible:
         score = score_item(item, keywords)
         if score <= 0:
             continue
@@ -61,7 +67,47 @@ def select_top_items(
         ),
         reverse=True,
     )
-    return [entry.item for entry in scored[:max_items]]
+    selected = _deduplicate_by_event([entry.item for entry in scored], max_items)
+
+    target_count = min(max_items, max(0, minimum_items))
+    if len(selected) >= target_count:
+        return selected
+
+    fallback_category_set = {category.casefold() for category in fallback_categories or [] if category}
+    if not fallback_category_set:
+        return selected
+
+    fallback_scored: list[ScoredItem] = []
+    for item in eligible:
+        if item.category.casefold() not in fallback_category_set:
+            continue
+
+        fingerprint = _fingerprint(item)
+        if fingerprint in seen:
+            continue
+
+        fallback_score = score_item(item, fallback_keywords or [])
+        if fallback_score <= 0:
+            continue
+
+        seen.add(fingerprint)
+        fallback_scored.append(ScoredItem(item=item, score=fallback_score))
+
+    fallback_scored.sort(
+        key=lambda entry: (
+            entry.item.published_at or dt.datetime.min.replace(tzinfo=dt.timezone.utc),
+            entry.score,
+        ),
+        reverse=True,
+    )
+    needed = target_count - len(selected)
+    selected = _deduplicate_by_event(
+        [*selected, *(entry.item for entry in fallback_scored)],
+        max_items,
+    )
+    if len(selected) > target_count:
+        return selected[:target_count]
+    return selected
 
 
 def _is_published_on_date(item: NewsItem, local_date: dt.date, timezone: dt.tzinfo) -> bool:
@@ -76,12 +122,11 @@ def score_item(item: NewsItem, keywords: list[str]) -> int:
     score = 0
 
     for keyword in keywords:
-        needle = keyword.casefold()
-        if not needle:
+        if not keyword.strip():
             continue
-        if needle in title:
+        if _matches_keyword(title, keyword):
             score += 3
-        if needle in summary:
+        if _matches_keyword(summary, keyword):
             score += 1
 
     return score
@@ -112,5 +157,130 @@ def _fingerprint(item: NewsItem) -> str:
     return normalize_url(item.url) or normalized_title
 
 
+def _deduplicate_by_event(items: list[NewsItem], max_items: int) -> list[NewsItem]:
+    selected: list[NewsItem] = []
+    seen_fingerprints: set[str] = set()
+    seen_terms: list[tuple[set[str], set[str]]] = []
+
+    for item in items:
+        fingerprint = _fingerprint(item)
+        if fingerprint in seen_fingerprints:
+            continue
+
+        title_terms = _title_terms(item)
+        event_terms = _event_terms(item)
+        if event_terms and any(
+            _is_same_event(title_terms, event_terms, previous_title_terms, previous_event_terms)
+            for previous_title_terms, previous_event_terms in seen_terms
+        ):
+            continue
+
+        seen_fingerprints.add(fingerprint)
+        if event_terms:
+            seen_terms.append((title_terms, event_terms))
+        selected.append(item)
+        if len(selected) >= max_items:
+            break
+
+    return selected
+
+
 def _contains_any(haystack: str, needles: list[str]) -> bool:
-    return any(needle.casefold() in haystack for needle in needles if needle)
+    return any(_matches_keyword(haystack, needle) for needle in needles if needle)
+
+
+def _matches_keyword(text: str, keyword: str) -> bool:
+    needle = keyword.casefold().strip()
+    if not needle:
+        return False
+    if _needs_word_boundaries(needle):
+        pattern = r"(?<![a-z0-9])" + r"\s+".join(re.escape(part) for part in needle.split()) + r"(?![a-z0-9])"
+        return re.search(pattern, text) is not None
+    return needle in text
+
+
+def _needs_word_boundaries(value: str) -> bool:
+    return all(char.isascii() and (char.isalnum() or char.isspace()) for char in value)
+
+
+def _title_terms(item: NewsItem) -> set[str]:
+    return _significant_terms(item.title)
+
+
+def _event_terms(item: NewsItem) -> set[str]:
+    return _significant_terms(f"{item.title} {item.summary}")
+
+
+def _significant_terms(text: str) -> set[str]:
+    normalized = text.casefold()
+    return {
+        term
+        for token in re.findall(r"[a-z0-9]+", normalized)
+        if len(term := _normalize_event_token(token)) >= 4 and term not in _EVENT_STOPWORDS
+    }
+
+
+def _normalize_event_token(token: str) -> str:
+    if token in {"independence", "independent", "indie"}:
+        return "independent"
+    if token == "games":
+        return "game"
+    if token == "studios":
+        return "studio"
+    return token
+
+
+def _is_same_event(
+    current_title: set[str],
+    current: set[str],
+    previous_title: set[str],
+    previous: set[str],
+) -> bool:
+    if _has_high_title_overlap(current_title, previous_title):
+        return True
+
+    overlap = current & previous
+    if len(overlap) < 3:
+        return False
+    smaller_size = min(len(current), len(previous))
+    return len(overlap) / smaller_size >= 0.45
+
+
+def _has_high_title_overlap(current_title: set[str], previous_title: set[str]) -> bool:
+    overlap = current_title & previous_title
+    if len(overlap) < 5:
+        return False
+    smaller_size = min(len(current_title), len(previous_title))
+    return smaller_size > 0 and len(overlap) / smaller_size >= 0.7
+
+
+_EVENT_STOPWORDS = {
+    "about",
+    "after",
+    "also",
+    "from",
+    "former",
+    "formerly",
+    "game",
+    "going",
+    "have",
+    "into",
+    "keep",
+    "last",
+    "latest",
+    "more",
+    "news",
+    "over",
+    "says",
+    "some",
+    "soon",
+    "studio",
+    "that",
+    "their",
+    "them",
+    "these",
+    "they",
+    "this",
+    "will",
+    "with",
+}

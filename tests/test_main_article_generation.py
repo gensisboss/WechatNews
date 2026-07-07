@@ -104,5 +104,89 @@ class MainArticleGenerationTests(unittest.TestCase):
             self.assertNotIn("这条消息来自", markdown)
 
 
+    def test_main_passes_minimum_and_fallback_config_to_selection_and_generation(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config = root / "config.yml"
+            sources = root / "sources.yml"
+            output = root / "output"
+            config.write_text(
+                textwrap.dedent(
+                    """
+                    title_template: "AI/Game Daily {date}"
+                    intro: "Today"
+                    max_items: 12
+                    minimum_articles: 5
+                    lookback_hours: 36
+                    published_today_only: true
+                    timezone: "Asia/Shanghai"
+                    timeout_seconds: 5
+                    keywords:
+                      - AI
+                      - game
+                    fallback_categories:
+                      - tech
+                    fallback_keywords:
+                      - technology
+                      - software
+                    exclude_keywords:
+                    article_generation:
+                      enabled: true
+                      api_key: "config-key"
+                      model: "deepseek-chat"
+                      max_articles: 2
+                    wechat:
+                      create_draft: false
+                    """
+                ).strip(),
+                encoding="utf-8",
+            )
+            sources.write_text(
+                textwrap.dedent(
+                    """
+                    sources:
+                      - name: Example
+                        url: https://example.com/feed.xml
+                        category: ai
+                        enabled: true
+                    """
+                ).strip(),
+                encoding="utf-8",
+            )
+            items = [
+                NewsItem(
+                    title=f"AI or technology story {index}",
+                    url=f"https://example.com/story-{index}",
+                    source="Example",
+                    published_at=dt.datetime(2026, 7, 6, index, tzinfo=dt.timezone.utc),
+                    summary="AI technology update.",
+                )
+                for index in range(5)
+            ]
+
+            with (
+                patch("src.main.fetch_all_sources", return_value=items),
+                patch("src.main.select_top_items", return_value=items) as select_top_items,
+                patch("src.main.DeepSeekArticleClient"),
+                patch("src.main.generate_articles", return_value=[]) as generate_articles,
+            ):
+                exit_code = main(
+                    [
+                        "--config",
+                        str(config),
+                        "--sources",
+                        str(sources),
+                        "--output",
+                        str(output),
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(select_top_items.call_args.kwargs["minimum_items"], 5)
+            self.assertEqual(select_top_items.call_args.kwargs["fallback_categories"], ["tech"])
+            self.assertEqual(select_top_items.call_args.kwargs["fallback_keywords"], ["technology", "software"])
+            self.assertEqual(list(generate_articles.call_args.args[0]), items)
+
+
 if __name__ == "__main__":
     unittest.main()

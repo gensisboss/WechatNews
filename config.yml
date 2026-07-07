@@ -1,6 +1,7 @@
 title_template: "AI/游戏行业观察 {date}"
 intro: "以下文章根据公开新闻原文整理和改写，聚焦事件背后的产业意义，并在标题下配原文图片。"
 max_items: 12
+minimum_articles: 5
 lookback_hours: 36
 published_today_only: true
 timezone: "Asia/Shanghai"
@@ -29,6 +30,38 @@ keywords:
   - NetEase
   - mini game
   - NPC
+
+fallback_categories:
+  - tech
+
+fallback_keywords:
+  - technology
+  - tech
+  - software
+  - hardware
+  - startup
+  - startups
+  - cloud
+  - chip
+  - chips
+  - semiconductor
+  - cybersecurity
+  - security
+  - smartphone
+  - device
+  - devices
+  - internet
+  - app
+  - apps
+  - Apple
+  - Google
+  - Microsoft
+  - Amazon
+  - Meta
+  - Nvidia
+  - Tesla
+  - robot
+  - robotics
 
 exclude_keywords:
   - giveaway

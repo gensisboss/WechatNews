@@ -59,6 +59,26 @@ sources:
     category: "game"
     enabled: true
 
+  - name: "TechCrunch"
+    url: "https://techcrunch.com/feed/"
+    category: "tech"
+    enabled: true
+
+  - name: "The Verge"
+    url: "https://www.theverge.com/rss/index.xml"
+    category: "tech"
+    enabled: true
+
+  - name: "Ars Technica"
+    url: "https://feeds.arstechnica.com/arstechnica/index"
+    category: "tech"
+    enabled: true
+
+  - name: "Wired"
+    url: "https://www.wired.com/feed/rss"
+    category: "tech"
+    enabled: true
+
   - name: "Global Search AI"
     url: "gdelt://search?query=(AI%20OR%20%22artificial%20intelligence%22%20OR%20%22generative%20AI%22)&category=ai&max_records=50&timespan=1d"
     category: "ai"

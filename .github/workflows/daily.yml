@@ -6,9 +6,21 @@ on:
     - cron: "0 1 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   create-draft:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     env:
       WECHAT_APP_ID: ${{ secrets.WECHAT_APP_ID }}
       WECHAT_APP_SECRET: ${{ secrets.WECHAT_APP_SECRET }}
@@ -32,9 +44,28 @@ jobs:
       - name: Generate digest and create WeChat draft
         run: python src/main.py --config config.yml --sources sources.yml --output output
 
+      - name: Prepare GitHub Pages site
+        run: |
+          latest_html="$(ls -t output/*.html | head -n 1)"
+          cp "$latest_html" output/index.html
+          echo "gongganghao.com" > output/CNAME
+          touch output/.nojekyll
+
       - name: Upload generated digest
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: wechat-news-digest
           path: output/
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: output
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

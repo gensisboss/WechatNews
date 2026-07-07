@@ -57,6 +57,9 @@ def main(argv: list[str] | None = None) -> int:
         lookback_hours=int(config.get("lookback_hours", 36)),
         published_today_only=bool(config.get("published_today_only", False)),
         timezone=parse_timezone(str(config.get("timezone", "+00:00"))),
+        minimum_items=int(config.get("minimum_articles", 0)),
+        fallback_categories=list(config.get("fallback_categories", [])),
+        fallback_keywords=list(config.get("fallback_keywords", [])),
     )
 
     title = render_title(str(config.get("title_template", "AI/Game Daily {date}")))
@@ -64,7 +67,11 @@ def main(argv: list[str] | None = None) -> int:
 
     article_config = config.get("article_generation", {})
     if bool(article_config.get("enabled", False)):
-        article_items = selected[: int(article_config.get("max_articles", len(selected)))]
+        article_limit = max(
+            int(article_config.get("max_articles", len(selected))),
+            int(config.get("minimum_articles", 0)),
+        )
+        article_items = selected[:article_limit]
         client = DeepSeekArticleClient(
             api_key=str(article_config.get("api_key", "")) or None,
             model=str(article_config.get("model", "deepseek-chat")),
