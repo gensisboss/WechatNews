@@ -1,6 +1,9 @@
 name: Daily WeChat News Draft
 
 on:
+  push:
+    branches:
+      - main
   schedule:
     # 09:00 Asia/Shanghai.
     - cron: "0 1 * * *"
@@ -48,7 +51,7 @@ jobs:
         run: |
           latest_html="$(ls -t output/*.html | head -n 1)"
           cp "$latest_html" output/index.html
-          echo "gongganghao.com" > output/CNAME
+          echo "news.gongganghao.com" > output/CNAME
           touch output/.nojekyll
 
       - name: Upload generated digest
